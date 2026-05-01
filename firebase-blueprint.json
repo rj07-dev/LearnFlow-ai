@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Public profile and non-sensitive user data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Roadmap": {
+      "title": "Roadmap",
+      "description": "Learning roadmap generated for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "targetGoal": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "estimatedTotalWeeks": { "type": "number" },
+        "progress": { "type": "number" },
+        "streakCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "phases": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "required": ["userId", "title", "targetGoal", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/roadmaps/{roadmapId}": {
+      "schema": "Roadmap",
+      "description": "Student roadmaps"
+    }
+  }
+}
