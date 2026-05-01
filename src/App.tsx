@@ -19,9 +19,14 @@ import { generateRoadmap } from './services/roadmapService';
 import { cn } from './lib/utils';
 import { Sparkles, LayoutDashboard, Calendar, Library, LineChart, LogOut, Settings, BarChart3, User, BookMarked, Loader2 } from 'lucide-react';
 import { EmptyState } from './components/EmptyState';
+import { PlannerView } from './components/PlannerView';
+import { ResourcesView } from './components/ResourcesView';
+import { ProgressView } from './components/ProgressView';
+import { ProfileView } from './components/ProfileView';
 
 export default function App() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'landing' | 'generator' | 'app'>('landing');
   const [currentPath, setCurrentPath] = useState('/dashboard');
@@ -35,7 +40,17 @@ export default function App() {
   const roadmap = roadmaps.find(r => r.id === activeRoadmapId) || roadmaps[0] || null;
 
   useEffect(() => {
+    const savedDemo = localStorage.getItem('learnflow_demo_user');
+    if (savedDemo) {
+      setUser(JSON.parse(savedDemo));
+      setIsDemo(true);
+      setLoading(false);
+      setView('app');
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (u) => {
+      if (localStorage.getItem('learnflow_demo_user')) return;
       setUser(u);
       setLoading(false);
       if (u) {
@@ -57,8 +72,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setRoadmaps([]);
+    if (!user || isDemo) {
+      if (!user) setRoadmaps([]);
       return;
     }
 
@@ -71,7 +86,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, isDemo]);
 
   const handleLogin = () => {
     setAuthError(null);
@@ -91,19 +106,36 @@ export default function App() {
       });
   };
 
+  const handleDemoLogin = () => {
+    const mockUser = {
+      uid: 'demo_user_123',
+      email: 'demo.student@learnflow.ai',
+      displayName: 'Alex Rivers',
+      photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex'
+    };
+    setIsDemo(true);
+    setUser(mockUser);
+    localStorage.setItem('learnflow_demo_user', JSON.stringify(mockUser));
+    setView('app');
+  };
+
   const handleGenerate = async (prefs: UserPreferences) => {
     if (!user) {
-      await handleLogin();
+      handleLogin();
       return;
     }
 
     setIsGenerating(true);
     try {
-      const newRoadmap = await generateRoadmap(prefs, user.uid);
+      const newRoadmap = await generateRoadmap(prefs, user.uid, isDemo);
+      if (isDemo) {
+        setRoadmaps(prev => [newRoadmap, ...prev]);
+      }
       setActiveRoadmapId(newRoadmap.id);
       setView('app');
       setCurrentPath('/dashboard');
     } catch (error) {
+      console.error("Roadmap generation error:", error);
       alert("Failed to generate roadmap. Please try again.");
     } finally {
       setIsGenerating(false);
@@ -128,6 +160,11 @@ export default function App() {
     const completedTasks = allTasks.filter(t => t.completed).length;
     const progress = (completedTasks / allTasks.length) * 100;
 
+    if (isDemo) {
+        setRoadmaps(prev => prev.map(r => r.id === roadmap.id ? { ...r, phases: updatedPhases, progress } : r));
+        return;
+    }
+
     try {
       await updateDoc(doc(db, 'roadmaps', roadmap.id), {
         phases: updatedPhases,
@@ -139,6 +176,15 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (isDemo) {
+        localStorage.removeItem('learnflow_demo_user');
+        setUser(null);
+        setIsDemo(false);
+        setRoadmaps([]);
+        setActiveRoadmapId(null);
+        setView('landing');
+        return;
+    }
     signOut(auth);
     setRoadmaps([]);
     setActiveRoadmapId(null);
@@ -191,40 +237,52 @@ export default function App() {
 
     switch (currentPath) {
       case '/planner':
-        return <EmptyState icon={Calendar} title="Study Planner" description="Optimize your study schedule with AI-driven time-blocking and deadline tracking. Coming very soon!" onAction={() => setCurrentPath('/dashboard')} actionLabel="Back to Dashboard" />;
+        return <PlannerView roadmap={roadmap} onToggleTask={handleToggleTask} />;
       case '/resources':
-        return <EmptyState icon={Library} title="Resource Vault" description="Your personalized library of curated learning materials, saved across all your roadmaps." onAction={() => setCurrentPath('/dashboard')} actionLabel="Back to Dashboard" />;
+        return <ResourcesView roadmaps={roadmaps} />;
       case '/progress':
-        return <EmptyState icon={BarChart3} title="Learning Analytics" description="Dive deep into your learning patterns, streak history, and detailed subject mastery reports." onAction={() => setCurrentPath('/dashboard')} actionLabel="Back to Dashboard" />;
+        return <ProgressView roadmaps={roadmaps} />;
       case '/roadmaps':
-        return roadmap ? (
+        return roadmaps.length > 0 ? (
            <div className="space-y-8">
              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-display font-bold">My Roadmaps</h2>
-                <button onClick={() => setView('generator')} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-500/20">
+                <h2 className="text-3xl font-display font-bold text-slate-900">My Roadmaps</h2>
+                <button onClick={() => setView('generator')} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-all">
                   <Sparkles className="w-4 h-4" /> New Roadmap
                 </button>
              </div>
              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div 
-                  onClick={() => setCurrentPath('/dashboard')}
-                  className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-brand-300 transition-all cursor-pointer group"
-                >
-                  <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-600 mb-6 group-hover:bg-brand-600 group-hover:text-white transition-colors">
-                    <BookMarked className="w-6 h-6" />
+                {roadmaps.map(r => (
+                  <div 
+                    key={r.id}
+                    onClick={() => {
+                        setActiveRoadmapId(r.id);
+                        setCurrentPath('/dashboard');
+                    }}
+                    className={cn(
+                      "bg-white p-6 rounded-3xl border shadow-sm transition-all cursor-pointer group",
+                      activeRoadmapId === r.id ? "border-brand-500 ring-4 ring-brand-50" : "border-slate-100 hover:border-brand-300"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-colors",
+                      activeRoadmapId === r.id ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-600 group-hover:bg-brand-600 group-hover:text-white"
+                    )}>
+                      <BookMarked className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-lg font-bold mb-1 line-clamp-1">{r.title}</h3>
+                    <p className="text-sm text-slate-500 mb-6 line-clamp-2 h-10">{r.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{Math.round(r.progress)}% Complete</span>
+                      <button className="text-brand-600 font-bold text-sm">View Path</button>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold mb-1">{roadmap.title}</h3>
-                  <p className="text-sm text-slate-500 mb-6 line-clamp-2">{roadmap.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase">{Math.round(roadmap.progress)}% Complete</span>
-                    <button className="text-brand-600 font-bold text-sm">View Path</button>
-                  </div>
-                </div>
+                ))}
              </div>
            </div>
         ) : <EmptyState icon={BookMarked} title="No Roadmaps Found" description="Start your journey by generating your first personalized learning path." onAction={() => setView('generator')} actionLabel="Generate Now" />;
       case '/profile':
-        return <EmptyState icon={User} title="Student Profile" description="Customize your learning preferences, notification settings, and public profile." onAction={() => setCurrentPath('/dashboard')} actionLabel="Back to Dashboard" />;
+        return <ProfileView user={user} onLogout={handleLogout} />;
       default:
         return <EmptyState icon={LayoutDashboard} title="Dashboard" description="Select a roadmap or generate a new one to see your dashboard results." onAction={() => setView('generator')} actionLabel="Get Started" />;
     }
@@ -241,6 +299,7 @@ export default function App() {
         >
           <LandingPage 
             onStart={user ? () => setView('generator') : handleLogin} 
+            onDemoStart={handleDemoLogin}
             isAuthenticating={isAuthenticating}
             authError={authError}
           />

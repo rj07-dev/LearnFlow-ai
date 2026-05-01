@@ -58,7 +58,7 @@ const ROADMAP_SCHEMA = {
   required: ['title', 'description', 'estimatedTotalWeeks', 'phases']
 };
 
-export async function generateRoadmap(prefs: UserPreferences, userId: string): Promise<Roadmap> {
+export async function generateRoadmap(prefs: UserPreferences, userId: string, skipFirestore = false): Promise<Roadmap> {
   const prompt = `
     Generate a detailed learning roadmap for a student with the following goal and constraints:
     Goal: ${prefs.goal}
@@ -111,15 +111,17 @@ export async function generateRoadmap(prefs: UserPreferences, userId: string): P
       }))
     };
 
-    try {
-      await setDoc(doc(db, "roadmaps", roadmap.id), roadmap);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `roadmaps/${roadmap.id}`);
+    if (!skipFirestore) {
+      try {
+        await setDoc(doc(db, "roadmaps", roadmap.id), roadmap);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `roadmaps/${roadmap.id}`);
+      }
     }
 
     return roadmap;
   } catch (error) {
     console.error("Failed to generate roadmap:", error);
-    throw new Error("Learning roadmap generation failed. Please try again.");
+    throw error;
   }
 }

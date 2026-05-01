@@ -9,11 +9,12 @@ import { ArrowRight, BookOpen, Brain, Sparkles, Target, Trophy, LineChart, Loade
 
 interface LandingPageProps {
   onStart: () => void;
+  onDemoStart: () => void;
   isAuthenticating?: boolean;
   authError?: string | null;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onStart, isAuthenticating, authError }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onStart, onDemoStart, isAuthenticating, authError }) => {
   return (
     <div className="min-h-screen bg-slate-50 overflow-hidden">
       {/* Decorative background elements */}
@@ -29,7 +30,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart, isAuthenticat
         </div>
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors">Features</a>
-          <a href="#about" className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors">How it works</a>
+          <button 
+            onClick={onDemoStart}
+            className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors"
+          >
+            Try Demo
+          </button>
           <button 
             onClick={onStart}
             disabled={isAuthenticating}
@@ -94,8 +100,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart, isAuthenticat
                   </>
                 )}
               </button>
-              <button className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold text-lg hover:bg-slate-50 transition-all">
-                See Examples
+              <button 
+                onClick={onDemoStart}
+                className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold text-lg hover:bg-slate-50 transition-all shadow-sm"
+              >
+                Try Demo Mode
               </button>
             </div>
 
